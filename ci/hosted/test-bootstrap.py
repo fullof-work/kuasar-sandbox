@@ -20,8 +20,8 @@ class BootstrapTests(unittest.TestCase):
             "control": {"curl", "git", "jq", "python3", "python3-yaml", "util-linux"},
             "release-control": {"curl", "git", "jq"},
             "kernel": {"build-essential", "bc", "bison", "flex", "libelf-dev", "libssl-dev", "libncurses-dev", "pkg-config", "time"},
-            "runtime": {"autoconf", "automake", "libtool", "uuid-dev", "liblz4-dev", "libzstd-dev", "zlib1g-dev", "libfuse3-dev"},
-            "runtime-publish": {"autoconf", "automake", "libtool", "uuid-dev"},
+            "runtime": {"autoconf", "automake", "libtool", "uuid-dev", "libssl-dev", "liblz4-dev", "libzstd-dev", "zlib1g-dev", "libfuse3-dev"},
+            "runtime-publish": {"autoconf", "automake", "libtool", "uuid-dev", "libssl-dev"},
             "source": {"cmake", "clang", "libclang-dev", "libsnappy-dev", "iproute2", "kmod", "acl", "e2fsprogs", "redis-server"},
         }
         for profile, expected in required.items():

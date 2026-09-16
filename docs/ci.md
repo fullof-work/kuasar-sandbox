@@ -99,6 +99,16 @@ This mode neither infers nor reads component `main`. Each unit's documentation, 
 
 Cache entries live at `$KUASAR_NATIVE_CACHE_ROOT/v2/<arch>/<component>/<input-hash>/`. Hosted bootstrap sets this root inside the disposable job directory; persistent runners retain `/var/cache/kuasar/native`. Hosted caches are local reuse only and are not uploaded to Actions cache or artifacts. The input hash covers build scripts, patches/configuration, upstream digests, architecture, Go/Cargo/C/C++ toolchains and pkg-config resolution. Entries are published through staging, checksums and atomic rename. Descriptor, payload and tar paths are checked again before restoring a hit. Corrupt entries fail rather than being repaired in place.
 
+EROFS keys include OpenSSL/uuid pkg-config metadata and selected libraries, target
+compiler resolution, and optional `guest-runtime/native-deps/deps/erofs-patches/*.patch`
+with adjacent `.license` records. A missing or empty patch directory is supported;
+adding, changing or removing a patch changes the key. Hosted native profiles install
+`libssl-dev`; openEuler's existing `openssl-devel` supplies both static OpenSSL
+archives. EROFS's optional local build stamp, link map (with its two EROFS object/archive
+inputs) and generated source `LICENSES` are retained alongside its binaries, `AUTHORS` and `COPYING`, allowing unchanged
+restores to be reused and keeping matching source/license inputs. Repository patch
+files remain from the admitted source set; cache restore does not replace them.
+
 Build and restore of the same key hold an entry lock. Each component retains its four most recently used keys by default. Reclamation only removes entries beyond the protection period whose locks can be acquired without blocking. Cache tests:
 
 ```bash

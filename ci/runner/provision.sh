@@ -63,6 +63,7 @@ PACKAGES=(
     git git-lfs rsync util-linux util-linux-devel iproute iptables nftables
     procps-ng which time file hostname kmod iputils jq socat openssl sqlite
     gcc gcc-c++ libstdc++-static make cmake autoconf automake libtool pkgconf
+    # openEuler openssl-devel includes libcrypto.a/libssl.a for guest EROFS.
     glibc-devel openssl-devel elfutils-libelf-devel ncurses-devel flex bison dwarves perl bc
     lz4-devel zstd-devel zlib-devel snappy-devel
     rust cargo rust-std-static clang llvm bpftool
@@ -1098,6 +1099,8 @@ verify_slots() {
             systemctl is-active --quiet docker.service
             docker info >/dev/null
             test -s /usr/lib64/libuuid.a
+            test -s /usr/lib64/libcrypto.a
+            test -s /usr/lib64/libssl.a
             fsck_help=$(fsck.erofs --help 2>&1)
             dump_help=$(dump.erofs --help 2>&1)
             grep -Fq -- --extract <<< "$fsck_help"

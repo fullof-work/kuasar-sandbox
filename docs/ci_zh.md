@@ -169,6 +169,15 @@ hosted 只做本地复用,不向 Actions cache 或 artifact 上传缓存。input
 条目通过 staging、校验和及原子 rename 发布;命中恢复前重新校验 descriptor、payload 和
 tar 路径。损坏条目失败,不会在原目录修补。
 
+EROFS key 包含 OpenSSL/uuid 的 pkg-config 元数据和选中的库、目标编译器解析，以及
+可选的 `guest-runtime/native-deps/deps/erofs-patches/*.patch` 和相邻 `.license`
+记录。补丁目录缺失或为空均受支持；新增、修改或移除补丁会改变 key。hosted native
+profile 安装 `libssl-dev`；openEuler 现有的 `openssl-devel` 提供两个静态 OpenSSL
+archive。可选的 EROFS 本地构建 stamp、link map（及其两个 EROFS object/archive
+输入）和生成源码的 `LICENSES` 与二进制、
+`AUTHORS`、`COPYING` 一同保留，让输入未变的恢复产物继续复用，并携带匹配的源码/许可证
+输入。仓库补丁文件仍来自准入的 source set，cache restore 不覆盖它们。
+
 同 key 构建和恢复持有条目锁。每组件默认保留最近使用的 4 个 key,且只回收超过保护期并能
 非阻塞取得锁的条目。缓存测试入口:
 
