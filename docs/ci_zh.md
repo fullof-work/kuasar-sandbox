@@ -171,7 +171,9 @@ tar 路径。损坏条目失败,不会在原目录修补。
 
 EROFS key 包含 OpenSSL/uuid 的 pkg-config 元数据和选中的库、目标编译器解析，以及
 可选的 `guest-runtime/native-deps/deps/erofs-patches/*.patch` 和相邻 `.license`
-记录。补丁目录缺失或为空均受支持；新增、修改或移除补丁会改变 key。hosted native
+记录。若存在 `erofs-patches/series` 和 `deps/erofs-recipe.sh`，它们也进入 key，
+因此补丁顺序和应用逻辑变化会使旧产物失效。旧源码集合可以不含这些文件，补丁目录
+缺失或为空也受支持；新增、修改或移除输入均会改变 key。hosted native
 profile 安装 `libssl-dev`；openEuler 现有的 `openssl-devel` 提供两个静态 OpenSSL
 archive。可选的 EROFS 本地构建 stamp、link map（及其两个 EROFS object/archive
 输入）和生成源码的 `LICENSES` 与二进制、

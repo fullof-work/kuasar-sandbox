@@ -95,11 +95,14 @@ component_input_paths() {
             required_file guest-runtime/native-deps/Makefile
             required_file guest-runtime/native-deps/deps/common.sh
             required_file guest-runtime/native-deps/deps/build-erofs.sh
+            if [ -f "$WORKSPACE_ROOT/guest-runtime/native-deps/deps/erofs-recipe.sh" ]; then
+                required_file guest-runtime/native-deps/deps/erofs-recipe.sh
+            fi
             # Separate EROFS patch PRs may add this directory; older source
             # sets have none. Never restore repository inputs from a cache.
             if [ -d "$WORKSPACE_ROOT/guest-runtime/native-deps/deps/erofs-patches" ]; then
                 find "$WORKSPACE_ROOT/guest-runtime/native-deps/deps/erofs-patches" \
-                    -maxdepth 1 -type f \( -name '*.patch' -o -name '*.license' \) -print0
+                    -maxdepth 1 -type f \( -name '*.patch' -o -name '*.license' -o -name series \) -print0
             fi
             ;;
         envd)

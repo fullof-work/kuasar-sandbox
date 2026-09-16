@@ -101,8 +101,11 @@ Cache entries live at `$KUASAR_NATIVE_CACHE_ROOT/v2/<arch>/<component>/<input-ha
 
 EROFS keys include OpenSSL/uuid pkg-config metadata and selected libraries, target
 compiler resolution, and optional `guest-runtime/native-deps/deps/erofs-patches/*.patch`
-with adjacent `.license` records. A missing or empty patch directory is supported;
-adding, changing or removing a patch changes the key. Hosted native profiles install
+with adjacent `.license` records. When present, `erofs-patches/series` and
+`deps/erofs-recipe.sh` also enter the key, so patch order and application logic
+changes invalidate outputs. Older source sets without these files and a missing
+or empty patch directory are supported; adding, changing or removing an input
+changes the key. Hosted native profiles install
 `libssl-dev`; openEuler's existing `openssl-devel` supplies both static OpenSSL
 archives. EROFS's optional local build stamp, link map (with its two EROFS object/archive
 inputs) and generated source `LICENSES` are retained alongside its binaries, `AUTHORS` and `COPYING`, allowing unchanged

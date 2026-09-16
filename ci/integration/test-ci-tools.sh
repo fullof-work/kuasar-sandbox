@@ -654,6 +654,36 @@ for mutation in add edit license remove; do
 done
 [ "$empty_patch_key" = "$previous_key" ] || fail "removed patches left a different input key"
 
+# Patch order and the helper that applies it are independent recipe inputs.
+# Older source sets without either file retain the same key after removal.
+erofs_fixture_key() {
+    env PATH="$TMP/bin:$PATH" PKG_CONFIG="$pkg_bin/pkg-config" \
+        PKG_CONFIG_FIXTURE="$pkg_fixture" KUASAR_WORKSPACE_ROOT="$pkg_workspace" \
+        "$SCRIPT_DIR/../native-cache/native-cache.sh" key erofs | cut -f2
+}
+printf 'first patch\n' > "$patch_dir/first.patch"
+printf 'second patch\n' > "$patch_dir/second.patch"
+legacy_recipe_key="$(erofs_fixture_key)"
+printf 'first.patch\nsecond.patch\n' > "$patch_dir/series"
+ordered_key="$(erofs_fixture_key)"
+[ "$ordered_key" != "$legacy_recipe_key" ] || fail "adding EROFS series did not invalidate key"
+printf 'second.patch\nfirst.patch\n' > "$patch_dir/series"
+reordered_key="$(erofs_fixture_key)"
+[ "$reordered_key" != "$ordered_key" ] || fail "reordering EROFS series did not invalidate key"
+rm "$patch_dir/series"
+[ "$(erofs_fixture_key)" = "$legacy_recipe_key" ] || fail "removed EROFS series did not restore legacy key"
+
+recipe_helper="$pkg_workspace/guest-runtime/native-deps/deps/erofs-recipe.sh"
+printf 'apply_erofs_patches() { patch -p1 < "$1"; }\n' > "$recipe_helper"
+helper_key="$(erofs_fixture_key)"
+[ "$helper_key" != "$legacy_recipe_key" ] || fail "adding EROFS recipe helper did not invalidate key"
+printf 'apply_erofs_patches() { patch --fuzz=0 -p1 < "$1"; }\n' > "$recipe_helper"
+changed_helper_key="$(erofs_fixture_key)"
+[ "$changed_helper_key" != "$helper_key" ] || fail "changing EROFS recipe helper did not invalidate key"
+rm "$recipe_helper"
+[ "$(erofs_fixture_key)" = "$legacy_recipe_key" ] || fail "removed EROFS recipe helper did not restore legacy key"
+printf 'test-ci-tools: EROFS series order and recipe helper mutations PASS\n'
+
 vmlinux_workspace="$TMP/vmlinux-workspace"
 setup_vmlinux_workspace "$vmlinux_workspace"
 vmlinux_key_plain="$(env PATH="$TMP/bin:$PATH" KUASAR_WORKSPACE_ROOT="$vmlinux_workspace" \
