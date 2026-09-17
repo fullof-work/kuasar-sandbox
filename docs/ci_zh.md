@@ -169,16 +169,11 @@ hosted 只做本地复用,不向 Actions cache 或 artifact 上传缓存。input
 条目通过 staging、校验和及原子 rename 发布;命中恢复前重新校验 descriptor、payload 和
 tar 路径。损坏条目失败,不会在原目录修补。
 
-EROFS key 包含 OpenSSL/uuid 的 pkg-config 元数据和选中的库、目标编译器解析，以及
-可选的 `guest-runtime/native-deps/deps/erofs-patches/*.patch` 和相邻 `.license`
-记录。若存在 `erofs-patches/series` 和 `deps/erofs-recipe.sh`，它们也进入 key，
-因此补丁顺序和应用逻辑变化会使旧产物失效。旧源码集合可以不含这些文件，补丁目录
-缺失或为空也受支持；新增、修改或移除输入均会改变 key。hosted native
-profile 安装 `libssl-dev`；openEuler 现有的 `openssl-devel` 提供两个静态 OpenSSL
-archive。可选的 EROFS 本地构建 stamp、link map（及其两个 EROFS object/archive
-输入）和生成源码的 `LICENSES` 与二进制、
-`AUTHORS`、`COPYING` 一同保留，让输入未变的恢复产物继续复用，并携带匹配的源码/许可证
-输入。仓库补丁文件仍来自准入的 source set，cache restore 不覆盖它们。
+EROFS key 包含 Libgcrypt/Libgpg-error/uuid 的 pkg-config 元数据、目标编译器/工具字节、实际本地源码归档字节（固定 URL 则使用预期摘要）及有界的编译/静态链接探针。探针跟踪实际包含的头文件（含强制 include）以及通过选项、sysroot 和库搜索路径真正选中的静态库/启动对象。源码 URL 或文件名是定位信息，不是内容身份。工作区文件使用可迁移的逻辑标签；具有语义的编译器和 sysroot 选项值仍然有效。未固定摘要的 URL 不能授权共享缓存；须使用固定 URL 或本地归档。
+
+可选的 `guest-runtime/native-deps/deps/erofs-patches` 材料、有序 `series` 和 `deps/erofs-recipe.sh` 都进入 key。仍支持不含这些文件的旧源码集合，包括旧 OpenSSL 配方的实际目标链接探针。新增、修改或移除输入都会使 key 失效。hosted native profile 安装 `libgcrypt20-dev libgpg-error-dev uuid-dev`，并保留 `libssl-dev` 以支持已经准入的旧源码集合。openEuler 24.03-LTS-SP4 的 `libgcrypt-1.10.2-4` 和 `libgpg-error-1.47-1` 源码 RPM 明确禁用静态库，仅安装 devel 软件包不够。使用此 guest 后端前须配齐匹配的静态构建及源码/重新链接/许可证材料；缺少 archive 时 runner 依赖检查明确失败。
+
+EROFS 保留唯一可选的 `bin/<arch>/.erofs-recipe` v2 stamp（含两个输出摘要和实际外部编译/链接依赖）、两个链接映射及其 EROFS 对象/静态库输入，以及源码 `LICENSES`、`AUTHORS` 和 `COPYING`。恢复相同配方时无需完整解压源码树即可复用。没有 stamp 的旧缓存仍可读取，并在下一次配方检查时重建。仓库补丁文件仍来自准入的 source set，cache restore 不覆盖它们。Runtime 补丁材料验证使用所选提交的本地 Git 对象；独立验证器必须能访问这些对象。真实发布打包仍须配齐实际目标的版权/声明及源码/重新链接输入。
 
 同 key 构建和恢复持有条目锁。每组件默认保留最近使用的 4 个 key,且只回收超过保护期并能
 非阻塞取得锁的条目。缓存测试入口:

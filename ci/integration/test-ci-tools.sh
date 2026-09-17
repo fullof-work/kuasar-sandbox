@@ -450,7 +450,7 @@ case "$target" in
         chmod +x "$workdir/bin/$arch/mkfs.erofs" "$workdir/bin/$arch/fsck.erofs"
         printf 'erofs authors fixture\n' >"$workdir/build/$arch/src/erofs-utils/AUTHORS"
         printf 'erofs copying fixture\n' >"$workdir/build/$arch/src/erofs-utils/COPYING"
-        printf 'erofs build stamp fixture\n' >"$workdir/bin/$arch/.erofs-build-inputs"
+        printf 'erofs build stamp fixture\n' >"$workdir/bin/$arch/.erofs-recipe"
         mkdir -p "$workdir/build/$arch/src/erofs-utils/mkfs" "$workdir/build/$arch/src/erofs-utils/LICENSES"
         printf 'erofs map fixture\n' >"$workdir/build/$arch/src/erofs-utils/mkfs/mkfs.erofs.map"
         mkdir -p "$workdir/build/$arch/src/erofs-utils/lib/.libs"
@@ -582,10 +582,10 @@ pkg_bin="$TMP/pkg-bin"
 setup_erofs_workspace "$pkg_workspace"
 mkdir -p "$pkg_fixture/lib" "$pkg_bin"
 printf 'Name: uuid fixture\nVersion: 1\n' >"$pkg_fixture/uuid.pc"
-for module in uuid openssl libssl libcrypto; do
+for module in uuid libgcrypt gpg-error; do
     printf 'Name: %s fixture\nVersion: 1\n' "$module" >"$pkg_fixture/$module.pc"
 done
-for library in uuid ssl crypto; do
+for library in uuid gcrypt gpg-error; do
     printf 'static %s v1\n' "$library" >"$pkg_fixture/lib/lib$library.a"
 done
 cat >"$pkg_bin/pkg-config" <<'EOF'
@@ -601,9 +601,8 @@ case "${1:-}" in
     --libs)
         case "${@: -1}" in
             uuid) libs=-luuid ;;
-            libssl) libs='-lssl -lcrypto' ;;
-            libcrypto) libs=-lcrypto ;;
-            openssl) libs='-lssl -lcrypto' ;;
+            libgcrypt) libs='-lgcrypt -lgpg-error' ;;
+            gpg-error) libs=-lgpg-error ;;
         esac
         printf '%s\n' "-L$PKG_CONFIG_FIXTURE/lib $libs"
         ;;
@@ -622,14 +621,14 @@ pkg_key_v2="$(env PATH="$TMP/bin:$PATH" PKG_CONFIG="$pkg_bin/pkg-config" \
 [ "$pkg_key_v1" != "$pkg_key_v2" ] \
     || fail "pkg-config selected library did not invalidate the erofs key"
 
-# Independently vary OpenSSL metadata and both selected static libraries.
+# Independently vary Libgcrypt metadata and both selected static libraries.
 previous_key="$pkg_key_v2"
-for input in openssl.pc libssl.pc libcrypto.pc lib/libcrypto.a lib/libssl.a; do
+for input in libgcrypt.pc gpg-error.pc lib/libgcrypt.a lib/libgpg-error.a; do
     printf 'updated\n' >> "$pkg_fixture/$input"
     next_key="$(env PATH="$TMP/bin:$PATH" PKG_CONFIG="$pkg_bin/pkg-config" \
         PKG_CONFIG_FIXTURE="$pkg_fixture" KUASAR_WORKSPACE_ROOT="$pkg_workspace" \
         "$SCRIPT_DIR/../native-cache/native-cache.sh" key erofs | cut -f2)"
-    [ "$previous_key" != "$next_key" ] || fail "OpenSSL $input did not invalidate EROFS"
+    [ "$previous_key" != "$next_key" ] || fail "Libgcrypt $input did not invalidate EROFS"
     previous_key="$next_key"
 done
 
@@ -794,7 +793,7 @@ env PATH="$TMP/bin:$PATH" FAKE_BUILD_COUNTER="$material_counter" CARGO_HOME="$ca
 rm -f \
     "$cross_workspace/guest-runtime/native-deps/bin/x86_64/mkfs.erofs" \
     "$cross_workspace/guest-runtime/native-deps/build/x86_64/src/erofs-utils/COPYING" \
-    "$cross_workspace/guest-runtime/native-deps/bin/x86_64/.erofs-build-inputs" \
+    "$cross_workspace/guest-runtime/native-deps/bin/x86_64/.erofs-recipe" \
     "$cross_workspace/guest-runtime/native-deps/build/x86_64/src/erofs-utils/mkfs/mkfs.erofs.map" \
     "$cross_workspace/guest-runtime/native-deps/build/x86_64/src/erofs-utils/LICENSES/fixture" \
     "$cross_workspace/guest-runtime/native-deps/build/x86_64/src/erofs-utils/mkfs/mkfs_erofs-main.o" \
@@ -817,7 +816,7 @@ env PATH="$TMP/bin:$PATH" FAKE_BUILD_COUNTER="$material_counter" CARGO_HOME="$ca
 [ -s "$cross_workspace/guest-runtime/native-deps/build/x86_64/src/erofs-utils/COPYING" ] \
     || fail "hot erofs cache did not restore source license material"
 for restored in \
-    bin/x86_64/.erofs-build-inputs \
+    bin/x86_64/.erofs-recipe \
     build/x86_64/src/erofs-utils/mkfs/mkfs.erofs.map \
     build/x86_64/src/erofs-utils/LICENSES/fixture \
     build/x86_64/src/erofs-utils/mkfs/mkfs_erofs-main.o \
@@ -1000,4 +999,5 @@ if find "$TMP/source-workspace" -maxdepth 1 \
     fail "source materializer left a staging directory behind"
 fi
 
+python3 "$SCRIPT_DIR/../native-cache/test-erofs-inputs.py"
 echo "test-ci-tools: PASS"

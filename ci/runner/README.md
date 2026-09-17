@@ -95,6 +95,8 @@ E2E are installed from the same mirror. GNU `time` provides per-stage CPU,
 memory, and I/O metrics. Every install reconciles the package manifest so
 existing slots receive newly added build dependencies.
 
+The Libgcrypt guest SHA backend also requires target `libgcrypt.a` and `libgpg-error.a`. The openEuler 24.03-LTS-SP4 source packages `libgcrypt-1.10.2-4.oe2403sp4` and `libgpg-error-1.47-1.oe2403sp4` use `--disable-static`; installing their devel packages does not supply these archives. Template provisioning checks the actual compiler-resolved static libraries and fails with guidance if they are absent. Matching static source builds, their exact build configuration, copyright/notices and source/relink materials must be supplied before provisioning can complete. This change does not add a new source-build or material-catalog format for those libraries. OpenSSL remains a separate host kernel prerequisite.
+
 Changing the pinned util-linux source requires overriding the complete source
 descriptor together: `KUASAR_UTIL_LINUX_SRPM_URL`,
 `KUASAR_UTIL_LINUX_SRPM_SHA256`, `KUASAR_UTIL_LINUX_SOURCE_ARCHIVE`, and

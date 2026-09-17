@@ -79,6 +79,8 @@ RocksDB 链接的 `cache-ctl` 所需 `libstdc++-static`,以及 Accelerator E2E �
 Redis server 也从同一镜像安装。GNU `time` 采集分阶段 CPU、内存和 I/O 指标。
 每次安装都会对齐包清单,让已有 slot 取得新加入的构建依赖。
 
+Libgcrypt guest SHA 后端还需要目标 `libgcrypt.a` 和 `libgpg-error.a`。openEuler 24.03-LTS-SP4 的源码包 `libgcrypt-1.10.2-4.oe2403sp4` 和 `libgpg-error-1.47-1.oe2403sp4` 使用 `--disable-static`；安装 devel 软件包不会提供这些 archive。模板准备会检查编译器实际解析出的静态库，缺失时明确失败并给出指引。必须先提供匹配的静态源码构建、精确构建配置、版权/声明及源码/重新链接材料，才能完成准备。本次没有为这两个库新增源码构建器或材料目录格式。OpenSSL 仍是独立的 host 内核构建依赖。
+
 修改 util-linux pin 必须同时覆盖完整来源描述:
 `KUASAR_UTIL_LINUX_SRPM_URL`、`KUASAR_UTIL_LINUX_SRPM_SHA256`、
 `KUASAR_UTIL_LINUX_SOURCE_ARCHIVE` 和 `KUASAR_UTIL_LINUX_TARBALL_SHA256`。
