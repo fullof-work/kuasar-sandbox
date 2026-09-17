@@ -25,6 +25,11 @@ def run(arguments):
     return subprocess.check_output(arguments, text=True, stderr=subprocess.PIPE).strip()
 
 
+def config_site_paths(environment):
+    """Match Autoconf: an empty CONFIG_SITE also selects both defaults."""
+    return (environment.get("CONFIG_SITE") or "/usr/local/share/config.site /usr/local/etc/config.site").split()
+
+
 def main():
     root = Path(sys.argv[1]).resolve()
     cross = sys.argv[2]
@@ -88,7 +93,7 @@ def main():
         tool(name, command)
     for program in ("cc1", "collect2", "lto1", "ld", "as"):
         tool("compiler/" + program, run(cc + ["-print-prog-name=" + program]))
-    for site in os.environ.get("CONFIG_SITE", "/usr/local/share/config.site /usr/local/etc/config.site").split():
+    for site in config_site_paths(os.environ):
         if Path(site).is_file():
             file(site)
 

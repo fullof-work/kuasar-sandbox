@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real compiler regressions for cache keys; all modified inputs are private."""
 import os
+import importlib.util
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,6 +12,15 @@ CACHE = Path(__file__).with_name("native-cache.sh").resolve()
 
 
 class InputsTests(unittest.TestCase):
+    def test_config_site_defaults_and_explicit_list(self):
+        spec = importlib.util.spec_from_file_location("erofs_inputs", CACHE.with_name("erofs-inputs.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        defaults = ["/usr/local/share/config.site", "/usr/local/etc/config.site"]
+        self.assertEqual(module.config_site_paths({}), defaults)
+        self.assertEqual(module.config_site_paths({"CONFIG_SITE": ""}), defaults)
+        self.assertEqual(module.config_site_paths({"CONFIG_SITE": "/a/site /b/site"}), ["/a/site", "/b/site"])
+
     def test_consumed_inputs_and_source_relocation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -74,7 +74,7 @@ PACKAGES=(
 )
 BOOTSTRAP_PACKAGES=(filesystem glibc bash coreutils)
 HOST_PACKAGES=(
-    bash coreutils findutils grep gawk tar xz curl rsync util-linux procps-ng
+    bash coreutils findutils grep gawk tar xz curl rsync util-linux procps-ng python3
     systemd systemd-container systemd-nspawn dnf rpm cpio
     iproute iptables kmod
 )
@@ -508,6 +508,23 @@ install_static_libuuid() {
         || die "static libuuid build did not produce /usr/lib64/libuuid.a"
 }
 
+static_crypto_helper() {
+    local helper="$SCRIPT_DIR/static-crypto.py"
+    # provision.sh is also installed as a standalone /usr/local/sbin command.
+    if [ ! -f "$helper" ]; then helper="$SCRIPT_DIR/../libexec/kuasar-static-crypto/static-crypto.py"; fi
+    [ -f "$helper" ] && [ -f "${helper%/*}/static-crypto-catalog.py" ] \
+        || die "static crypto provider is missing; install the paired runner helpers"
+    python3 "$helper" "$@"
+}
+
+install_static_crypto() {
+    static_crypto_helper install --root "$TEMPLATE_ROOT" --sources "$SOURCE_CACHE" --download --jobs 2
+}
+
+copy_static_crypto() {
+    static_crypto_helper copy --template "$TEMPLATE_ROOT" --root "$1"
+}
+
 check_erofs_static_libraries() {
     # The supported SP4 libgcrypt 1.10.2-4 and libgpg-error 1.47-1 SRPMs
     # explicitly use --disable-static. Do not assume -devel provides .a files.
@@ -517,7 +534,7 @@ check_erofs_static_libraries() {
             library=$(gcc -print-file-name="lib$name.a")
             test "$library" != "lib$name.a" && test -s "$library" || exit 1
         done
-    ' || die "guest EROFS requires target static libgcrypt.a, libgpg-error.a and libuuid.a. openEuler 24.03-LTS-SP4 crypto devel packages omit static archives; provision matching static builds and their source/relink/license materials before preparing this template. No shared-library or OpenSSL fallback is supported."
+    ' || die "guest EROFS static-library preflight failed after provisioning libgcrypt.a, libgpg-error.a and libuuid.a"
 }
 
 install_erofs_readers() {
@@ -603,6 +620,9 @@ install_host_support() {
     install -m 0755 "$SCRIPT_DIR/kuasar-ci-bpf" /usr/local/libexec/kuasar-ci-bpf
     install -m 0644 "$SCRIPT_DIR/kuasar-ci-bpf.service" /etc/systemd/system/kuasar-ci-bpf.service
     install -m 0755 "$SCRIPT_DIR/provision.sh" /usr/local/sbin/kuasar-ci-runner-provision
+    install -d -m 0755 /usr/local/libexec/kuasar-static-crypto
+    install -m 0644 "$SCRIPT_DIR/static-crypto.py" "$SCRIPT_DIR/static-crypto-catalog.py" \
+        /usr/local/libexec/kuasar-static-crypto/
 
     local uplink
     uplink="$(ip route show default | awk 'NR == 1 { print $5 }')"
@@ -685,6 +705,7 @@ build_template_root() {
     touch "$TEMPLATE_ROOT/.kuasar-ci-template"
 
     install_static_libuuid
+    install_static_crypto
     check_erofs_static_libraries
     install_erofs_readers
 
@@ -834,6 +855,7 @@ prepare_slot() {
     install -m 0644 "$TEMPLATE_ROOT/root/.cargo/config.toml" "$root/root/.cargo/config.toml"
     install -m 0644 "$TEMPLATE_ROOT/etc/resolv.conf" "$root/etc/resolv.conf"
     copy_static_libuuid "$root"
+    copy_static_crypto "$root"
     copy_erofs_readers "$root"
 
     local machine_id template_machine_id
