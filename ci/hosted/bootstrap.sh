@@ -42,7 +42,8 @@ select_profile() {
         packages+=(bc bison flex libelf-dev libssl-dev libncurses-dev)
     fi
     if $with_native; then
-        packages+=(autoconf automake libtool uuid-dev liblz4-dev libzstd-dev zlib1g-dev libfuse3-dev)
+        # Keep libssl-dev for already-admitted older EROFS source sets.
+        packages+=(autoconf automake libtool patch uuid-dev libgcrypt20-dev libgpg-error-dev libssl-dev liblz4-dev libzstd-dev zlib1g-dev libfuse3-dev)
     fi
     if $with_vm; then
         packages+=(cmake clang llvm libclang-dev libsnappy-dev libssl-dev
