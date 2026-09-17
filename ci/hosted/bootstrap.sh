@@ -36,14 +36,17 @@ select_profile() {
         *) die "unknown profile: $profile" ;;
     esac
     if $with_native || $with_kernel; then
-        packages+=(build-essential pkg-config)
+        # Kernel releases also run the maintained native dependency test target,
+        # which compiles the actual EROFS SHA backend rather than only mocks.
+        packages+=(build-essential pkg-config autoconf automake libtool patch
+            uuid-dev libgcrypt20-dev libgpg-error-dev)
     fi
     if $with_kernel; then
         packages+=(bc bison flex libelf-dev libssl-dev libncurses-dev)
     fi
     if $with_native; then
         # Keep libssl-dev for already-admitted older EROFS source sets.
-        packages+=(autoconf automake libtool patch uuid-dev libgcrypt20-dev libgpg-error-dev libssl-dev liblz4-dev libzstd-dev zlib1g-dev libfuse3-dev)
+        packages+=(libssl-dev liblz4-dev libzstd-dev zlib1g-dev libfuse3-dev)
     fi
     if $with_vm; then
         packages+=(cmake clang llvm libclang-dev libsnappy-dev libssl-dev
