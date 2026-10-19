@@ -56,6 +56,8 @@ finalize 才能成功；skip/cancel/failure 不能成为合并依据。
 plan 固定 aggregate tag commit、六个独立 unit 的版本/SHA、Release/asset ID、大小、摘要和成功的聚合 run。
 新双架构 aggregate 的发布说明还绑定验证 profile 与真实制品摘要。
 
+当前维护的 aggregate 尚未发布时，显式前驱仍是经过验证的二进制基线。可信准入 base 的清单也可以选择更新的组件 tag；每个差异 tag 必须已有完整双架构发布，并具备精确 tag/commit、大小和摘要元数据。CI 运输这些固定 tag 的源码，重建其产品及链接或内嵌消费者，使用对应测试 owner 的文件树，然后叠加已准入候选与 companion 源码。候选清单不能选择这些 tag；不完整发布和混合需求代际仍然失败。runtime 与 kernel tag 保持独立，仅改变 runtime tag 不会选择内核重建。
+
 基线或 ARM 资产缺失时明确失败并要求初始化。不会拼接组件 Latest，也不会回退全源码构建。
 历史 AMD64-only 发布仍是合法历史发布，只是不满足双架构基线。
 见 [首次 ARM 初始化](release_zh.md#first-arm-initialization)。
@@ -315,3 +317,7 @@ accelerator、connector、sandboxer、orchestrator 已切为 Public，并读回�
 - [部署](deployment_zh.md)：运行能力与服务。
 - [Runner 运维](../ci/runner/README.md)：既有持久基础设施。
 - [测试快速开始](../test/QUICKSTART.md)：开发者 E2E 条件。
+
+补充自托管 E2E 从可信 resolve 作业生成的小型同运行归档恢复固定范围的稀疏执行器。Git 将原始 commit、tree 和 blob 对象打包到新仓库，不复制远端配置或凭据；export 属性不能改写或遗漏受控文件。resolve 通过工作流输出传递归档 SHA-256 和预期 Git tree。在执行归档内任何代码之前，启动步骤核验该摘要和精确工作流 SHA；恢复步骤继续核验 commit/tree、全部 Git 对象、受控文件一致性及原有稀疏范围。符号链接、gitlink、特殊权限、超限归档和不安全路径立即失败。固定版本的官方下载 action 启动步骤限时五分钟，恢复限时三分钟；公共托管 E2E 保留原 checkout。这减少补充 runner 上重复的 Git 连接和延迟 fetch，prepared 产品仍使用下述有界本地下载器。
+
+架构作业通过本地 action 下载同一次运行的 artifact。每次尝试从解析元数据之前开始计时，600 秒硬时限覆盖响应头、传输、压缩归档 SHA-256 校验和解压；最多尝试三次，退避 15/30 秒，每次使用新的签名 URL、连接和独立临时目录。首次成功取得元数据后固定 artifact ID、生产作业、大小和 digest。认证、证书、身份、digest、归档及未知错误立即终止；仅明确分类的临时传输错误和硬超时可以重试。取消先终止并回收工作进程再清理，整个选择集校验成功后才原子移入目标目录。步骤上限为 35 分钟，现有作业总时限继续生效。日志仅记录阶段、尝试次数和耗时，不输出运行时令牌或签名 URL。Node 入口接收 runner 提供的同运行身份并调用 Python 标准库实现，不安装依赖，也不扩大工作流权限。
