@@ -22,6 +22,8 @@ import download_artifact as d
 
 RUN = '11111111-1111-1111-1111-111111111111'
 JOB = '22222222-2222-2222-2222-222222222222'
+PRIOR_RUN = '33333333-3333-3333-3333-333333333333'
+PRIOR_JOB = '44444444-4444-4444-4444-444444444444'
 BASE = ''
 DIRECTORY_RECORD = None
 
@@ -87,8 +89,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         state = self.server.state
         data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        state['rpc_requests'].append((self.path.rsplit('/', 1)[-1], data,
+                                      self.headers.get('Authorization')))
         if self.path.endswith('/ListArtifacts'):
             state['lists'] += 1
+            if state['mode'] == 'list_auth':
+                self.send_body(b'not authorized: timeout is only text', 403)
+                return
             if state['mode'] == 'metadata_stall' and state['lists'] == 1:
                 time.sleep(.6)
             body = self.server.archive
@@ -97,7 +104,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             row = {'workflow_run_backend_id': RUN, 'workflow_job_run_backend_id': JOB,
                    'database_id': artifact_id, 'name': 'wanted', 'size': str(len(body)),
                    'digest': 'sha256:' + digest}
-            self.send_body(json.dumps({'artifacts': [row]}).encode())
+            row.update(state.get('artifact_overrides', {}))
+            if state['mode'] == 'metadata_change' and state['lists'] > 1:
+                row.update(state['replacement_fields'])
+            rows = [dict(row, **values) for values in state.get('extra_artifacts', [])] + [row]
+            self.send_body(json.dumps({'artifacts': rows}).encode())
         elif self.path.endswith('/GetSignedArtifactURL'):
             state['urls'] += 1
             self.send_body(json.dumps({'signed_url': BASE + '/blob/' + str(state['urls']) +
@@ -113,7 +124,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if mode == 'auth':
             self.send_body(b'not authorized: timeout is only text', 403)
             return
-        if (mode in ('reset', 'replacement') and number == 1) or mode == 'reset_always':
+        if (mode in ('reset', 'replacement', 'metadata_change') and number == 1) or mode == 'reset_always':
             self.connection.shutdown(socket.SHUT_RDWR)
             self.connection.close()
             return
@@ -148,7 +159,7 @@ class DownloadTests(unittest.TestCase):
         self.server = Server(('127.0.0.1', 0), Handler)
         self.server.archive = zip_bytes()
         self.server.state = {'mode': 'ok', 'lists': 0, 'urls': 0, 'requests': [],
-                             'blob_authorizations': []}
+                             'blob_authorizations': [], 'rpc_requests': []}
         BASE = 'http://127.0.0.1:' + str(self.server.server_port)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -175,6 +186,122 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual((self.root / 'out/payload.txt').read_bytes(), b'complete verified content')
         self.assertEqual(self.server.state['blob_authorizations'], [None])
         self.assertEqual(self.delays, [])
+
+    def test_prior_attempt_artifact_uses_current_scope_and_producer_signing_ids(self):
+        self.server.state['artifact_overrides'] = {
+            'workflow_run_backend_id': PRIOR_RUN, 'workflow_job_run_backend_id': PRIOR_JOB}
+        self.run_download('reset')
+        self.assertEqual((self.root / 'out/payload.txt').read_bytes(), b'complete verified content')
+        self.assertEqual(self.delays, [15])
+        calls = self.server.state['rpc_requests']
+        self.assertEqual([method for method, _, _ in calls],
+                         ['ListArtifacts', 'GetSignedArtifactURL'] * 2)
+        for method, data, authorization in calls:
+            self.assertEqual(authorization, 'Bearer test-token')
+            self.assertEqual(data, {'workflow_run_backend_id': RUN,
+                                    'workflow_job_run_backend_id': JOB}
+                             if method == 'ListArtifacts' else
+                             {'workflow_run_backend_id': PRIOR_RUN,
+                              'workflow_job_run_backend_id': PRIOR_JOB, 'name': 'wanted'})
+        self.assertEqual(self.server.state['blob_authorizations'], [None, None])
+
+    def test_latest_name_version_is_downloaded_without_stale_producer_fallback(self):
+        self.server.state['artifact_overrides'] = {'database_id': '10'}
+        self.server.state['extra_artifacts'] = [{
+            'database_id': '9', 'workflow_run_backend_id': PRIOR_RUN,
+            'workflow_job_run_backend_id': PRIOR_JOB, 'digest': 'sha256:' + '0' * 64}]
+        self.run_download('reset')
+        self.assertEqual((self.root / 'out/payload.txt').read_bytes(), b'complete verified content')
+        self.assertEqual(self.delays, [15])
+        for method, data, _ in self.server.state['rpc_requests']:
+            self.assertEqual(data['workflow_run_backend_id'], RUN)
+            self.assertEqual(data['workflow_job_run_backend_id'], JOB)
+
+    def test_newest_invalid_metadata_cannot_fall_back_to_older_valid_artifact(self):
+        self.server.state['artifact_overrides'] = {'database_id': '10', 'digest': None}
+        self.server.state['extra_artifacts'] = [{
+            'database_id': '9', 'digest': 'sha256:' + hashlib.sha256(self.server.archive).hexdigest()}]
+        with self.assertRaisesRegex(d.Failure, 'missing_digest'):
+            self.run_download('ok')
+        self.assertEqual(self.server.state['urls'], 0)
+        self.assertEqual(self.delays, [])
+        self.assertFalse((self.root / 'out').exists())
+
+    def test_latest_download_failure_never_tries_an_older_version(self):
+        for mode, reason, attempts in [('auth', 'http_403', 1),
+                                        ('digest', 'digest_mismatch', 1),
+                                        ('reset_always', 'connection_interrupted', 3)]:
+            with self.subTest(mode=mode):
+                self.server.state.update(lists=0, urls=0, requests=[], rpc_requests=[],
+                    artifact_overrides={'database_id': '10'},
+                    extra_artifacts=[{'database_id': '9', 'workflow_run_backend_id': PRIOR_RUN,
+                        'workflow_job_run_backend_id': PRIOR_JOB,
+                        'digest': 'sha256:' + hashlib.sha256(self.server.archive).hexdigest()}])
+                self.delays.clear()
+                with self.assertRaisesRegex(d.Failure, reason):
+                    self.run_download(mode)
+                signed = [data for method, data, _ in self.server.state['rpc_requests']
+                          if method == 'GetSignedArtifactURL']
+                self.assertEqual(len(signed), attempts)
+                self.assertTrue(all(data == {'workflow_run_backend_id': RUN,
+                    'workflow_job_run_backend_id': JOB, 'name': 'wanted'} for data in signed))
+                self.assertFalse((self.root / 'out').exists())
+
+    def test_retry_cannot_upgrade_or_roll_back_frozen_name_version(self):
+        for replacement in ('11', '8'):
+            with self.subTest(replacement=replacement):
+                self.server.state.update(lists=0, urls=0, requests=[],
+                    artifact_overrides={'database_id': '10'},
+                    extra_artifacts=[{'database_id': '9', 'workflow_run_backend_id': PRIOR_RUN,
+                                      'workflow_job_run_backend_id': PRIOR_JOB}],
+                    replacement_fields={'database_id': replacement})
+                self.delays.clear()
+                with self.assertRaisesRegex(d.Failure, 'artifact_identity_changed'):
+                    self.run_download('metadata_change')
+                self.assertEqual(self.server.state['lists'], 2)
+                self.assertEqual(self.server.state['urls'], 1)
+                self.assertEqual(self.delays, [15])
+                self.assertFalse((self.root / 'out').exists())
+
+    def test_latest_selection_is_numeric_order_independent_and_per_exact_name(self):
+        row = {'workflow_run_backend_id': RUN, 'workflow_job_run_backend_id': JOB,
+               'database_id': '10', 'name': 'wanted', 'size': '100', 'digest': '0' * 64}
+        older = {**row, 'database_id': '9', 'workflow_run_backend_id': PRIOR_RUN,
+                 'workflow_job_run_backend_id': PRIOR_JOB}
+        other = {**row, 'database_id': '11', 'name': 'wanted-other'}
+        for rows in ([older, row, other], [other, row, older], [row, older, other]):
+            with self.subTest(rows=rows):
+                exact = d.select_artifacts({'artifacts': rows}, {'name': 'wanted', 'pattern': ''})
+                pattern = d.select_artifacts({'artifacts': rows}, {'name': '', 'pattern': 'want*'})
+                self.assertEqual(exact, [d.normalize(row)])
+                self.assertEqual(pattern, [d.normalize(row), d.normalize(other)])
+        with self.assertRaisesRegex(d.Failure, 'ambiguous_artifact_identity'):
+            d.select_artifacts({'artifacts': [row, {**other, 'database_id': '10'}]},
+                               {'name': '', 'pattern': 'want*'})
+
+    def test_metadata_authorization_denial_cannot_fall_back_to_another_run(self):
+        with self.assertRaisesRegex(d.Failure, 'http_403'):
+            self.run_download('list_auth')
+        self.assertEqual(self.server.state['lists'], 1)
+        self.assertEqual(self.server.state['urls'], 0)
+        self.assertEqual(self.server.state['requests'], [])
+        self.assertEqual(self.delays, [])
+        self.assertFalse((self.root / 'out').exists())
+
+    def test_producer_ids_size_and_digest_are_frozen_across_retries(self):
+        for fields in ({'workflow_run_backend_id': PRIOR_RUN},
+                       {'workflow_job_run_backend_id': PRIOR_JOB},
+                       {'size': str(len(self.server.archive) + 1)},
+                       {'digest': 'sha256:' + '0' * 64}):
+            with self.subTest(fields=fields):
+                self.server.state.update(lists=0, urls=0, requests=[], replacement_fields=fields)
+                self.delays.clear()
+                with self.assertRaisesRegex(d.Failure, 'artifact_identity_changed'):
+                    self.run_download('metadata_change')
+                self.assertEqual(self.server.state['lists'], 2)
+                self.assertEqual(self.server.state['urls'], 1)
+                self.assertEqual(self.delays, [15])
+                self.assertFalse((self.root / 'out').exists())
 
     def test_headers_and_metadata_stall_and_drip_have_hard_deadline(self):
         for mode in ('metadata_stall', 'headers_stall', 'drip'):
@@ -283,21 +410,24 @@ class DownloadTests(unittest.TestCase):
             error = urllib.error.HTTPError('https://invalid', status, 'timeout', {}, None)
             self.assertFalse(d.classify(error).retryable)
 
-    def test_metadata_missing_digest_and_cross_run_fail_closed(self):
+    def test_metadata_missing_digest_and_invalid_producer_ids_fail_closed(self):
         row = {'workflow_run_backend_id': RUN, 'workflow_job_run_backend_id': JOB,
                'database_id': '1', 'name': 'wanted', 'size': '100'}
         with self.assertRaisesRegex(d.Failure, 'missing_digest'):
-            d.normalize(row, RUN)
+            d.normalize(row)
         row['digest'] = 'sha256:' + '0' * 64
-        with self.assertRaisesRegex(d.Failure, 'artifact_run_mismatch'):
-            d.normalize(row, JOB)
-        row['workflow_run_backend_id'] = RUN
+        for key, reason in [('workflow_run_backend_id', 'invalid_artifact_run'),
+                            ('workflow_job_run_backend_id', 'invalid_artifact_job')]:
+            for invalid in (None, '', '39312713058', '-' * 36, '1' * 36, '../another-run'):
+                with self.subTest(key=key, invalid=invalid):
+                    with self.assertRaisesRegex(d.Failure, reason):
+                        d.normalize({**row, key: invalid})
         selected = d.select_artifacts({'artifacts': [row]},
-                                     {'name': '', 'pattern': 'want*'}, RUN)
+                                     {'name': '', 'pattern': 'want*'})
         self.assertEqual(selected[0]['database_id'], '1')
         with self.assertRaisesRegex(d.Failure, 'ambiguous_artifact_identity'):
             d.select_artifacts({'artifacts': [row, row]},
-                               {'name': 'wanted', 'pattern': ''}, RUN)
+                               {'name': 'wanted', 'pattern': ''})
 
     def test_duplicate_and_cross_archive_paths_are_rejected(self):
         archive = self.root / 'duplicate.zip'
