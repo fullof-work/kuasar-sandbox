@@ -113,6 +113,11 @@ def changed_products(changes):
                        "pkg/remote", "pkg/sparse", "pkg/tailzip", "pkg/tarstream", "pkg/tar",
                        "pkg/cache", "pkg/store", "pkg/readerr", "internal/util"):
                 products.add("flatten-ctl")
+            # A carrier writer and its readers must use the same library input.
+            # Otherwise a new flatten-ctl can emit a format that baseline
+            # sandbox/node binaries cannot read, even with unchanged Go APIs.
+            if touches("pkg/tarstream"):
+                products.update(("sandbox-ctl", "node-ctl"))
         elif owner == "connector" and go:
             products.add("connector-ctl")
         elif owner == "sandboxer":

@@ -162,7 +162,7 @@ class WorkingSetDirectoryTest(unittest.TestCase):
 class WorkingSetDiffTest(unittest.TestCase):
     source_path = Path(__file__).with_name("sandbox-perf-working-set.sh")
 
-    def prepare(self, mode, reused=False):
+    def prepare(self, mode, reused=False, current=False, fail_create=False):
         source = self.source_path.read_text()
         # Execute the real helpers, including write_config's mode dispatch.
         start = re.search(r"^(?:format|prepare)_diff\(\) ", source, re.MULTILINE)
@@ -172,12 +172,26 @@ class WorkingSetDiffTest(unittest.TestCase):
             root = Path(tmp)
             diffs = root / "diffs"
             diffs.mkdir()
+            binary = root / "bin" / "sandbox-ctl"
+            binary.parent.mkdir()
+            binary.write_text('''#!/usr/bin/env python3
+import os, pathlib, sys
+if sys.argv[1:] == ['--help']:
+    print('sandbox-ctl diff create' if os.environ['CURRENT_DIFF'] == '1' else 'sandbox-ctl run')
+    sys.exit(0)
+with open(os.environ['FORMAT_CALLS'], 'a') as log: log.write(' '.join(sys.argv[1:])+'\\n')
+if os.environ['FAIL_CREATE'] == '1': sys.exit(19)
+assert sys.argv[1:3] == ['diff', 'create']
+pathlib.Path(sys.argv[sys.argv.index('--output')+1]).write_bytes(b'current-format-fixture')
+''')
+            binary.chmod(0o755)
             if reused:
                 for name in ("root", "scratch", "dataset"):
                     (diffs / f"{name}.ext4").write_bytes(b"stale" * 1024)
             # Only stub the formatter: record its actual argv, not the helper.
             # Real sparse-file creation remains observable on the host.
             script = "set -euo pipefail\n"
+            script += '. "$DIFF_FIXTURE_HELPER"\n'
             script += 'mkfs.ext4() { printf "%s\\n" "$*" >> "$FORMAT_CALLS"; }\n'
             script += helpers
             script += '\nwrite_config "$1/config.yaml" "$1/diffs" off'
@@ -185,7 +199,9 @@ class WorkingSetDiffTest(unittest.TestCase):
                 script += ' "$2"'
             env = dict(os.environ, FORMAT_CALLS=str(root / "formats"),
                        TAP_NAME="test-tap", GUEST_HTTP_IP="169.254.1.1",
-                       VMLINUX="/test/kernel", BIN="/test/bin",
+                       VMLINUX="/test/kernel", BIN=str(binary.parent),
+                       DIFF_FIXTURE_HELPER=str(self.source_path.parent.parent / 'lib/diff_fixture.sh'),
+                       CURRENT_DIFF=str(int(current)), FAIL_CREATE=str(int(fail_create)),
                        ROOT_KEY="root-key", DATASET_KEY="dataset-key")
             subprocess.run(["bash", "-c", script, "diff-test", tmp, mode or ""],
                            env=env, check=True, capture_output=True, text=True)
@@ -223,6 +239,24 @@ class WorkingSetDiffTest(unittest.TestCase):
         for size, blocks, prefix in files.values():
             self.assertEqual(blocks, 0)
             self.assertEqual(prefix, bytes(4096))
+
+    def test_current_product_owns_format_and_restore_starts_all_hole(self):
+        for mode, filesystem in [('cold', 'ext4'), ('restore', 'none')]:
+            with self.subTest(mode=mode):
+                calls, files = self.prepare(mode, reused=True, current=True)
+                self.assertEqual(len(calls), 3)
+                for call in calls:
+                    self.assertTrue(call.startswith('diff create --output '))
+                    self.assertTrue(call.endswith('--filesystem '+filesystem))
+                self.assertIn('--size 1G ', calls[0])
+                self.assertIn('--size 512M ', calls[1])
+                for _, _, prefix in files.values():
+                    self.assertEqual(prefix, b'current-format-fixture')
+
+    def test_current_format_error_is_not_replaced_with_raw(self):
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            self.prepare('cold', current=True, fail_create=True)
+        self.assertEqual(caught.exception.returncode, 19)
 
 
 class WorkingSetCheckpointTest(unittest.TestCase):

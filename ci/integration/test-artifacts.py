@@ -1160,6 +1160,14 @@ class ArtifactContracts(unittest.TestCase):
         self.assertIn("sandbox-runtime.bundle", products)
         self.assertNotIn("sandbox-ctl", products)
 
+    def test_carrier_changes_rebuild_readers_without_changing_storage_sources(self):
+        products = subject.changed_products({"accelerator": ["pkg/tarstream/write.go"]})
+        for product in ("flatten-ctl", "sandbox-runtime.bundle", "sandbox-ctl", "node-ctl"):
+            self.assertIn(product, products)
+        for product in ("sandbox-init", "cloud-hypervisor", "vmlinux"):
+            self.assertNotIn(product, products)
+        self.assertEqual(subject.changed_products({"accelerator": ["pkg/tarstream/write_test.go"]}), [])
+
     def test_results_require_both_exact_architectures_and_predeclared_suites(self):
         results = {arch: architecture_result(self.plan, arch) for arch in subject.ARCHES}
         subject.collect_results(self.plan, results)
