@@ -44,7 +44,7 @@ Candidate and companion product inputs are compared against their baseline sourc
 
 Build may retrieve exact library sources needed by local Go replacements, without rebuilding every library repository's standalone binaries. Unmodified products remain byte-identical to downloaded baseline archives; candidate product hashes must equal this run's actual build outputs. This is not a claim that unrelated clean rebuilds are reproducible byte for byte.
 
-Tarstream carrier changes also rebuild `sandbox-ctl` and `node-ctl` with the selected accelerator source. A newly encoded carrier must reach readers linked with the same library input; this does not select a sandboxer storage feature or change its source revision. Demo and working-set fixtures use `sandbox-ctl diff create` when the selected product exposes it, and retain raw provisioning only for historical binaries. A current-format creation error fails preparation without falling back to raw.
+Tarstream carrier changes also rebuild `sandbox-ctl` and `node-ctl` with the selected accelerator source. A newly encoded carrier must reach readers linked with the same library input; this does not select a sandboxer storage feature or change its source revision.
 
 ### Documentation qualification before downloads
 

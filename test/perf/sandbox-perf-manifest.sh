@@ -36,7 +36,6 @@ set -uo pipefail
 
 ITERS="${PERF_ITERS:-5}"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-. "$REPO_ROOT/test/e2e/lib/diff_fixture.sh"
 SRC_BIN="${BIN:-$REPO_ROOT/bin}"
 BIN_CACHE="${PERF_BIN_CACHE:-/tmp/perf-bin-$(uname -m)}"
 OUT="${PERF_OUT:-$REPO_ROOT/test/results/sandbox-perf-manifest.txt}"
@@ -413,7 +412,8 @@ run_cold_iter() {
     local d="$WORK/run-${tag}-$i"
     mkdir -p "$d/runtime"
     local diff="$d/runtime/blk1.diff"
-    create_diff_fixture "$BIN/sandbox-ctl" "$diff" 1G ext4 || return
+    truncate -s 1G "$diff"
+    mkfs.ext4 -q -F -O ^has_journal "$diff"
     write_sandbox_yaml "$d/sandbox.yaml" "$diff" \
         '["-c", "import sys; print('"'"'PYBOOT-OK'"'"', sys.version_info.major*100+sys.version_info.minor)"]'
 
@@ -474,7 +474,8 @@ start_long_sandbox() {
     local d="$WORK/long-$sid"
     mkdir -p "$d/runtime"
     local diff="$d/runtime/blk1.diff"
-    create_diff_fixture "$BIN/sandbox-ctl" "$diff" 1G ext4 || return
+    truncate -s 1G "$diff"
+    mkfs.ext4 -q -F -O ^has_journal "$diff"
     # Tight counter (no time.sleep) so the FIRST TICK after restore
     # appears immediately — measurement of restore latency would
     # otherwise be polluted by mid-sleep snapshot capture.
@@ -600,7 +601,7 @@ run_restore_iter() {
     local d="$WORK/restore-$tag-$i"
     mkdir -p "$d/runtime"
     local diff="$d/runtime/blk1.diff"
-    create_diff_fixture "$BIN/sandbox-ctl" "$diff" 1G none || return
+    truncate -s 1G "$diff"
     write_host_yaml "$d/host.yaml" "$diff"
 
     local log="$d/run.log"

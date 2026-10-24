@@ -22,7 +22,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=test/lib/working_set_tap.sh
 . "$REPO_ROOT/test/lib/working_set_tap.sh"
-. "$REPO_ROOT/test/e2e/lib/diff_fixture.sh"
 BIN="${BIN:-$REPO_ROOT/bin}"
 VMLINUX="${VMLINUX:-$BIN/vmlinux}"
 IMAGE="${IMAGE:-python:3.12-slim}"
@@ -449,12 +448,13 @@ DATASET_KEY=$("$BIN/manifest-ctl" store --manifest-config "$WORK/manifest.yaml" 
 prepare_diff() { # $1=path, $2=size, $3=cold|restore
     # Restore must inherit the captured filesystem. Fresh mkfs metadata would
     # occupy upper COW pages and mask the snapshot's superblock/inodes/data.
-    # Keep an existing sparse plaintext DIFF so crypto.local=auto does not
+    # Keep an existing sparse plaintext file so crypto.local=auto does not
     # introduce active-DIFF encryption into the local-artifact comparison.
-    local filesystem=none
-    [ "$3" != cold ] || filesystem=ext4
-    rm -f -- "$1"
-    create_diff_fixture "$BIN/sandbox-ctl" "$1" "$2" "$filesystem"
+    truncate -s 0 "$1"
+    truncate -s "$2" "$1"
+    if [ "$3" = cold ]; then
+        mkfs.ext4 -q -F -O ^has_journal "$1"
+    fi
 }
 
 write_config() { # $1=path, $2=diff dir, $3=prefetch, $4=cold|restore

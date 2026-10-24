@@ -69,7 +69,7 @@ orchestrator 的 `app/`、`config/` 是产品输入；文档或测试专属变�
 
 build 可获取 local Go replacement 所需的精确库源码，但不会因此重建所有 sibling 独立 CLI。
 
-tarstream 载体变更还会使用选定的 accelerator 源码重建 `sandbox-ctl` 和 `node-ctl`。新编码载体的读取端必须链接同一库输入；这不会选择 sandboxer 的存储功能或改变其源码版本。Demo 和 working-set 夹具在选定产品提供 `sandbox-ctl diff create` 时调用该命令，仅对历史二进制保留 raw 创建路径。新格式创建失败会直接导致准备失败，不回退到 raw。
+tarstream 载体变更还会使用选定的 accelerator 源码重建 `sandbox-ctl` 和 `node-ctl`。新编码载体的读取端必须链接同一库输入；这不会选择 sandboxer 的存储功能或改变其源码版本。
 未修改产品的 hash 必须等于下载基线；候选产品 hash 必须等于本轮真实 build 输出。
 不要求任意旧编排源码重建与基线天然字节相同。 Guest init 身份按已校验 Runtime 内嵌载荷核对；候选 init 必须进入该载荷，未变基线 Runtime 则保留原内嵌字节。
 

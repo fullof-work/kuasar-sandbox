@@ -376,8 +376,6 @@ class DocumentationPackageTest(unittest.TestCase):
             if path.is_file(): self.assertNotIn(b'SOURCE_ONLY_MARKER', path.read_bytes(), str(path))
         self.assertTrue((output / 'workbench/workbench').is_file())
         self.assertTrue((output / 'test/demo/demo_e2b.sh').is_file())
-        self.assertEqual((output / 'test/e2e/lib/diff_fixture.sh').read_bytes(),
-                         (ROOT / 'test/e2e/lib/diff_fixture.sh').read_bytes())
         self.assertTrue((self.root / 'platform/test/demo/test_demo_safety.sh').is_file())
 
     def test_missing_runtime_input_is_rejected(self):
