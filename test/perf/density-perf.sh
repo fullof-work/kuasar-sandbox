@@ -80,6 +80,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$REPO_ROOT/test/lib/tarstream.sh"
+. "$REPO_ROOT/test/lib/diff_fixture.sh"
 BIN="${BIN:-$REPO_ROOT/bin}"
 IMAGE="${IMAGE:-python:3.12-slim}"
 
@@ -461,8 +462,7 @@ for i in $(seq 1 "$N"); do
     mkdir -p "/sys/fs/cgroup/sandboxes/$sid"
     ip tuntap add "${sid}-tap" mode tap 2>/dev/null || true
     ip link set "${sid}-tap" up
-    truncate -s 1G "$WORK/${sid}.diff"
-    mkfs.ext4 -q -F -O ^has_journal "$WORK/${sid}.diff"
+    create_diff_fixture "$BIN/sandbox-ctl" "$WORK/${sid}.diff" 1G ext4
     emit_yaml "$sid"
     "$BIN/sandbox-ctl" run \
         --config "$WORK/$sid.yaml" \

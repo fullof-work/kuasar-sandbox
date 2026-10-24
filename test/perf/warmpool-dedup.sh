@@ -33,6 +33,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 . "$REPO_ROOT/test/lib/tarstream.sh"
+. "$REPO_ROOT/test/lib/diff_fixture.sh"
 BIN="${BIN:-$REPO_ROOT/bin}"
 IMAGE="${IMAGE:-python:3.12-slim}"
 N="${WARMPOOL_N:-2}"
@@ -186,14 +187,15 @@ echo "    blk0 manifest key: $BLK0_MKEY"
 
 mkdir -p "$WORK/runtime"
 
-# ---- prepare blk1 base (deterministic mkfs, copied per sandbox) ----------
+# ---- prepare blk1 base (one template, copied per sandbox) ---------------
 #
 # Per-sandbox formatting varies UUIDs, timestamps and inode initialization.
 # Reusing one journal-free template keeps the initial filesystem bytes shared.
 #
 # Production warm-pool model: blk1 is a CoW copy of a pre-built base diff
 # (one mkfs upstream, N copies downstream). Mirror that here:
-#   1. mkfs.ext4 once into base.diff with deterministic flags:
+#   1. Current products create their own working-file format. Historical
+#      products use raw ext4 with deterministic flags:
 #        -O ^has_journal            — no filesystem journal in the work disk
 #        -U <fixed UUID>             — same FS UUID across sandboxes
 #        -E nodiscard                — skip TRIM (which is also non-deterministic)
@@ -207,14 +209,19 @@ mkdir -p "$WORK/runtime"
 #      writes won't differ across sandboxes).
 #   2. cp base.diff blk1-i.diff per sandbox (each sandbox gets an
 #      independent copy to write into).
-echo "==> prepare base blk1 diff (deterministic mkfs)"
+echo "==> prepare shared base blk1 diff"
 BLK1_BASE="$WORK/runtime/blk1-base.diff"
-truncate -s 1G "$BLK1_BASE"
-SOURCE_DATE_EPOCH=1577836800 mkfs.ext4 -q -F -O ^has_journal \
-    -U 11111111-2222-3333-4444-555555555555 \
-    -E nodiscard,lazy_itable_init=0,hash_seed=00000000-0000-0000-0000-000000000000 \
-    -M / \
-    "$BLK1_BASE"
+DIFF_HELP="$("$BIN/sandbox-ctl" --help)"
+if grep -Fq 'sandbox-ctl diff create' <<<"$DIFF_HELP"; then
+    create_diff_fixture "$BIN/sandbox-ctl" "$BLK1_BASE" 1G ext4
+else
+    truncate -s 1G "$BLK1_BASE"
+    SOURCE_DATE_EPOCH=1577836800 mkfs.ext4 -q -F -O ^has_journal \
+        -U 11111111-2222-3333-4444-555555555555 \
+        -E nodiscard,lazy_itable_init=0,hash_seed=00000000-0000-0000-0000-000000000000 \
+        -M / \
+        "$BLK1_BASE"
+fi
 echo "    base diff sha256: $(sha256sum "$BLK1_BASE" | cut -d' ' -f1)"
 
 # ---- launch N sandboxes in series, snapshot each --------------------------
