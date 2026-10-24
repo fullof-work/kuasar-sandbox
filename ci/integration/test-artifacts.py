@@ -1168,6 +1168,14 @@ class ArtifactContracts(unittest.TestCase):
             self.assertNotIn(product, products)
         self.assertEqual(subject.changed_products({"accelerator": ["pkg/tarstream/write_test.go"]}), [])
 
+    def test_storage_library_rebuilds_node_checkpoint_reader(self):
+        products = subject.changed_products({"sandboxer": ["pkg/diffstore/checkpoint.go"]})
+        self.assertIn("sandbox-ctl", products)
+        self.assertIn("node-ctl", products)
+        self.assertNotIn("cluster-ctl", products)
+        self.assertNotIn("node-ctl", subject.changed_products({"sandboxer": ["cmd/sandbox-ctl/run.go"]}))
+        self.assertEqual(subject.changed_products({"sandboxer": ["pkg/diffstore/checkpoint_test.go"]}), [])
+
     def test_results_require_both_exact_architectures_and_predeclared_suites(self):
         results = {arch: architecture_result(self.plan, arch) for arch in subject.ARCHES}
         subject.collect_results(self.plan, results)

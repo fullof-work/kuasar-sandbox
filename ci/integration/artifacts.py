@@ -123,6 +123,11 @@ def changed_products(changes):
         elif owner == "sandboxer":
             if go:
                 products.add("sandbox-ctl")
+            # Node management reads checkpoint metadata through the sandboxer
+            # library while sandbox-ctl creates it. Keep both consumers on the
+            # selected library, without selecting different orchestrator code.
+            if touches("go.mod", "go.sum", "pkg", "internal"):
+                products.add("node-ctl")
             if touches("go.mod", "go.sum", "Makefile", "cmd/sandbox-init", "internal", "pkg"):
                 products.add("sandbox-init")
             if touches("native-deps"):

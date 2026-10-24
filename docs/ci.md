@@ -46,6 +46,8 @@ Build may retrieve exact library sources needed by local Go replacements, withou
 
 Tarstream carrier changes also rebuild `sandbox-ctl` and `node-ctl` with the selected accelerator source. A newly encoded carrier must reach readers linked with the same library input; this does not select a sandboxer storage feature or change its source revision.
 
+Sandboxer library changes likewise rebuild `node-ctl`, whose management and publication paths read checkpoint metadata. The orchestrator source selection remains unchanged. Working-set fixtures provide raw ext4 images through `diff_template` and leave active `diff` outputs absent; restore creates those outputs from the captured disk graph. Fresh active files follow the selected encryption policy, so local `off`/`auto` timing comparisons include active-file and carrier costs.
+
 ### Documentation qualification before downloads
 
 Source PR resolution first compares the complete exact base, head and integration
