@@ -33,7 +33,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 . "$REPO_ROOT/test/lib/tarstream.sh"
-. "$REPO_ROOT/test/lib/diff_fixture.sh"
+. "$REPO_ROOT/test/e2e/lib/diff_fixture.sh"
 BIN="${BIN:-$REPO_ROOT/bin}"
 IMAGE="${IMAGE:-python:3.12-slim}"
 N="${WARMPOOL_N:-2}"

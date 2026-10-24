@@ -80,7 +80,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$REPO_ROOT/test/lib/tarstream.sh"
-. "$REPO_ROOT/test/lib/diff_fixture.sh"
+. "$REPO_ROOT/test/e2e/lib/diff_fixture.sh"
 BIN="${BIN:-$REPO_ROOT/bin}"
 IMAGE="${IMAGE:-python:3.12-slim}"
 

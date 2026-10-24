@@ -35,7 +35,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=demo_common.sh
 . "$SCRIPT_DIR/demo_common.sh"
-. "$REPO_ROOT/test/lib/diff_fixture.sh"
+. "$REPO_ROOT/test/e2e/lib/diff_fixture.sh"
 
 demo_select_owner
 demo_default_data_dir

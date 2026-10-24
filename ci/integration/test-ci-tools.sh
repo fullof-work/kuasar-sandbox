@@ -82,7 +82,9 @@ for name, paths in fixtures.items():
         assert {'boot.cmdline', 'boot.root.base', 'launch'} <= paths, f'{name}: cold workload lost'
 
 assert 'truncate -s 1G "$BLK1_BASE"' in warm, 'warm-pool real 1 GiB capacity lost'
-assert perf.count('truncate -s 1G "$diff"') == 3, 'cold/long/restore real 1 GiB capacity lost'
+assert 'create_diff_fixture "$BIN/sandbox-ctl" "$BLK1_BASE" 1G ext4' in warm, 'warm-pool current-format 1 GiB capacity lost'
+assert perf.count('create_diff_fixture "$BIN/sandbox-ctl" "$diff" 1G ext4 || return') == 2, 'cold/long formatted 1 GiB capacity lost'
+assert perf.count('create_diff_fixture "$BIN/sandbox-ctl" "$diff" 1G none || return') == 1, 'restore all-Hole 1 GiB capacity lost'
 assert '\nchunker:\n  mode: cdc\n' in perf, 'manifest workload does not explicitly select CDC'
 assert '"${SANDBOX_FILES[@]}"' in warm, 'aggregate excludes uploaded Sandbox E artifacts'
 assert '"$SNAP_SANDBOX_REF" = "manifest://$SANDBOX_MKEY"' in warm, 'S -> E accounting identity unchecked'

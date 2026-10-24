@@ -22,7 +22,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=test/lib/working_set_tap.sh
 . "$REPO_ROOT/test/lib/working_set_tap.sh"
-. "$REPO_ROOT/test/lib/diff_fixture.sh"
+. "$REPO_ROOT/test/e2e/lib/diff_fixture.sh"
 BIN="${BIN:-$REPO_ROOT/bin}"
 VMLINUX="${VMLINUX:-$BIN/vmlinux}"
 IMAGE="${IMAGE:-python:3.12-slim}"

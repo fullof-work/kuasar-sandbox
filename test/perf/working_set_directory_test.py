@@ -200,7 +200,7 @@ pathlib.Path(sys.argv[sys.argv.index('--output')+1]).write_bytes(b'current-forma
             env = dict(os.environ, FORMAT_CALLS=str(root / "formats"),
                        TAP_NAME="test-tap", GUEST_HTTP_IP="169.254.1.1",
                        VMLINUX="/test/kernel", BIN=str(binary.parent),
-                       DIFF_FIXTURE_HELPER=str(self.source_path.parent.parent / 'lib/diff_fixture.sh'),
+                       DIFF_FIXTURE_HELPER=str(self.source_path.parent.parent / 'e2e/lib/diff_fixture.sh'),
                        CURRENT_DIFF=str(int(current)), FAIL_CREATE=str(int(fail_create)),
                        ROOT_KEY="root-key", DATASET_KEY="dataset-key")
             subprocess.run(["bash", "-c", script, "diff-test", tmp, mode or ""],
