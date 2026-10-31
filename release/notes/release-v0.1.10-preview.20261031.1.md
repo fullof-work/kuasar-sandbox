@@ -8,7 +8,7 @@
 
 **#378 影响此前所有版本，建议所有旧版部署尽快升级至 `release-v0.1.10`。** <!-- docs:allow-han -->
 
-Replace Sandboxer and Cloud Hypervisor together, including running old processes. Released pages must not regain stale parent-snapshot bytes. Lost release history in old snapshots cannot be reconstructed; validate important snapshots against expected application state.
+Upgrade the selected Sandboxer and its bundled patched Cloud Hypervisor v51.1 together, including running old processes. The v51.1 version string alone does not identify the #378 fix. Released pages must not regain stale parent-snapshot bytes. Lost release history in old snapshots cannot be reconstructed; validate important snapshots against expected application state.
 <!-- /kuasar-release-notice -->
 
 ## Highlights
