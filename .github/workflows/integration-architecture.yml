@@ -255,6 +255,8 @@ jobs:
     timeout-minutes: ${{ matrix.group.timeout_minutes }}
     strategy:
       fail-fast: false
+      # Supplemental ARM runners share host storage; bound the whole ARM lane.
+      max-parallel: ${{ inputs.arch == 'aarch64' && 2 || 256 }}
       matrix:
         group: ${{ fromJSON(needs.build.outputs.shards) }}
     concurrency:

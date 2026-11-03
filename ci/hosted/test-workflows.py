@@ -385,6 +385,17 @@ def check():
     # build job's validated plan. All other lane allocations remain hosted.
     assert lanes['e2e']['runs-on'] == '${{ matrix.group.runs_on }}'
     assert lanes['e2e']['strategy']['matrix'] == {'group': '${{ fromJSON(needs.build.outputs.shards) }}'}
+    # Throttle scheduling only: retain every planned group and every gate.
+    assert lanes['e2e']['strategy']['fail-fast'] is False
+    for arch, limit in (('aarch64', 2), ('x86_64', 256)):
+        context = {'inputs': {'arch': arch}}
+        assert expression(lanes['e2e']['strategy']['max-parallel'], context) == limit
+        groups = [{'id': f'group-{index}', 'cases': [f'case-{index}']}
+                  for index in range(15)]
+        context['needs'] = {'build': {'outputs': {'shards': json.dumps(groups)}}}
+        assert expression(lanes['e2e']['strategy']['matrix']['group'], context) == groups
+    assert lanes['e2e']['timeout-minutes'] == '${{ matrix.group.timeout_minutes }}'
+    assert 'continue-on-error' not in lanes['e2e']
     assert "needs.build.outputs.has_groups == 'true'" in lanes['e2e']['if']
     profile_config = json.loads((ROOT / 'ci/integration/runner-capabilities.json').read_text())
     for profile in profile_config['profiles'].values():
